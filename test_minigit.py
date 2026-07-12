@@ -348,7 +348,7 @@ class TestMiniGitSRS(unittest.TestCase):
 
 
     def test_show_command(self):
-        """SHOW 명령어의 최신/지정 커밋 상세 및 blobs 정보 출력 검증"""
+        """SHOW 명령어의 최신/지정 커밋 상세 및 file_meta 정보 출력 검증"""
         self.git = None
         self.run_cmd("INIT Alice")
         self.run_cmd("COMMIT 'First Commit' file1:content1")
@@ -357,13 +357,13 @@ class TestMiniGitSRS(unittest.TestCase):
         # 1. 인수 없이 최신 커밋 SHOW 실행 결과 검증
         out_latest = self.run_cmd("SHOW")
         self.assertIn("commit 2 (Alice", out_latest)
-        self.assertIn("Blobs: {'file2': 'content2'}", out_latest)
+        self.assertIn("FileMeta: {'file2': 'content2'}", out_latest)
         self.assertIn("Message: Second Commit", out_latest)
 
         # 2. 특정 커밋 해시 지정하여 SHOW 실행 결과 검증
         out_specific = self.run_cmd("SHOW 1")
         self.assertIn("commit 1 (Alice", out_specific)
-        self.assertIn("Blobs: {'file1': 'content1'}", out_specific)
+        self.assertIn("FileMeta: {'file1': 'content1'}", out_specific)
         self.assertIn("Message: First Commit", out_specific)
 
         # 3. 존재하지 않는 커밋 해시 에러 검증
@@ -390,6 +390,32 @@ class TestMiniGitSRS(unittest.TestCase):
         result.extend(left[i:])
         result.extend(right[j:])
         return result
+
+    def test_shortest_path_numeric_tie_breaker(self):
+        """숫자 문자열 ID를 사용한 다중 최단 경로 발생 시 tie-breaker가 정수순으로 제대로 동작하는지 검증"""
+        # 1 -> 3 -> 4 (정수 튜플: (1, 3, 4))
+        # 1 -> 21 -> 4 (정수 튜플: (1, 21, 4))
+        # 원래 문자열 사전순 비교 시에는 "1->21->4" < "1->3->4" 가 참이 되어 21번 경로가 선택되지만,
+        # 정수형 튜플 비교 시에는 (1, 3, 4) < (1, 21, 4) 가 참이 되어 3번 경로가 선택되어야 함.
+        from commit_graph import CommitGraph
+        graph = CommitGraph()
+        
+        # 가상의 커밋 그래프 직접 구성
+        graph.commit_dict["1"] = Commit(hash="1", message="C1", author="Alice", file_meta={}, parents=[])
+        graph.commit_dict["3"] = Commit(hash="3", message="C3", author="Alice", file_meta={}, parents=["1"])
+        graph.commit_dict["21"] = Commit(hash="21", message="C21", author="Alice", file_meta={}, parents=["1"])
+        graph.commit_dict["4"] = Commit(hash="4", message="C4", author="Alice", file_meta={}, parents=["3", "21"])
+        
+        # 자식 역색인 캐시 수동 매핑
+        graph.children_dict["1"] = ["3", "21"]
+        graph.children_dict["3"] = ["4"]
+        graph.children_dict["21"] = ["4"]
+        
+        # 최단 경로 탐색 수행
+        path = graph.find_shortest_path("1", "4")
+        
+        # 3번을 지나는 경로가 반환되었는지 검증 (리스트 타입으로 반환됨)
+        self.assertEqual(path, ["1", "3", "4"])
 
 if __name__ == "__main__":
     import sys

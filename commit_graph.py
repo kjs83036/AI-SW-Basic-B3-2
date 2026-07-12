@@ -11,7 +11,7 @@ class Commit:
     hash: str
     message: str
     author: str
-    blobs: dict
+    file_meta: dict
     parents: list = field(default_factory=list)
     timestamp: float = field(default_factory=time.time)
 
@@ -36,13 +36,13 @@ class CommitGraph:
         # 성능 최적화: 자식 노드(Children) 역색인 캐시
         self.children_dict = {}
 
-    def add_commit(self, message, author, blobs, parents):
+    def add_commit(self, message, author, file_meta, parents):
         """
         새로운 커밋을 그래프에 추가하고, 메시지와 작성자 정보에 대한 역색인을 생성/갱신합니다.
 
         :param message: 커밋 메시지
         :param author: 작성자 이름
-        :param blobs: 파일 스냅샷 딕셔너리
+        :param file_meta: 파일 메타데이터 딕셔너리
         :param parents: 부모 커밋 ID 리스트
         :return: 신규 생성된 커밋 ID
         """
@@ -53,7 +53,7 @@ class CommitGraph:
         parents_list = parents if parents is not None else []
 
         # Commit 객체 생성 및 딕셔너리에 등록
-        commit = Commit(str_commit_id, message, author, blobs, parents_list)
+        commit = Commit(str_commit_id, message, author, file_meta, parents_list)
         self.commit_dict[str_commit_id] = commit
 
         # 자식 노드 역색인 캐싱
@@ -241,13 +241,13 @@ class CommitGraph:
         if not found_paths:
             return None
 
-        # 다중 최단 경로 발생 시 tie-breaker: 경로 문자열 사전순 비교
+        # 다중 최단 경로 발생 시 tie-breaker: 경로를 정수로 변환하여 비교
         best_path = None
-        best_str = None
+        best_key = None
         for path in found_paths:
-            path_str = "->".join(path)
-            if best_str is None or path_str < best_str:
-                best_str = path_str
+            path_key = tuple(int(x) for x in path)
+            if best_key is None or path_key < best_key:
+                best_key = path_key
                 best_path = path
 
         return best_path

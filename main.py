@@ -52,7 +52,7 @@ class GitShell(cmd.Cmd):
             dt = datetime.fromtimestamp(commit.timestamp)
             date_str = dt.strftime("%Y-%m-%d %H:%M:%S")
             print(f"commit {commit.hash} ({commit.author}, {date_str}){branch_str}")
-            print(f"Blobs: {commit.blobs}")
+            print(f"FileMeta: {commit.file_meta}")
             print(commit.message)
             print()
 
@@ -187,22 +187,22 @@ class GitShell(cmd.Cmd):
             return False
 
         message = arg[0]
-        blobs = {}
+        file_meta = {}
         invalid = False
-        for blob_str in arg[1:]:
-            if ":" not in blob_str:
+        for file_str in arg[1:]:
+            if ":" not in file_str:
                 invalid = True
                 break
-            file_name, content = blob_str.split(":", 1)
-            blobs[file_name] = content
+            file_name, content = file_str.split(":", 1)
+            file_meta[file_name] = content
 
         if invalid:
             print("Invalid args")
             return False
 
-        #self.git.commit(message, blobs)
+        #self.git.commit(message, file_meta)
         if self.git is not None:
-            commit_id = self.git.commit(message, blobs)
+            commit_id = self.git.commit(message, file_meta)
             print(f"[{self.git.current_branch} {commit_id}] {message}")
         return False
 
@@ -235,7 +235,7 @@ class GitShell(cmd.Cmd):
     @require_init
     @args_to_list
     def do_SHOW(self, arg):
-        """SHOW [commit_hash] : 커밋의 상세 정보와 blobs를 출력합니다."""
+        """SHOW [commit_hash] : 커밋의 상세 정보와 file_meta를 출력합니다."""
         
         if len(arg) > 1:
             print("Invalid args")
@@ -264,7 +264,7 @@ class GitShell(cmd.Cmd):
             branch_str = f"[{', '.join(poingting_branchs)}]" if poingting_branchs else ""
 
             print(f"commit {commit.hash} ({commit.author}, {date_str}){branch_str}")
-            print(f"Blobs: {commit.blobs}")
+            print(f"FileMeta: {commit.file_meta}")
             print(f"Message: {commit.message}")
             return False
 

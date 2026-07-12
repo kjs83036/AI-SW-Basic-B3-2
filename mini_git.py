@@ -53,13 +53,13 @@ class Git:
 
         self.current_branch = branch_name
 
-    def commit(self, message, blobs, parents=None):
+    def commit(self, message, file_meta, parents=None):
         """
         새로운 커밋을 만들고 현재 브랜치의 포인터를 갱신합니다.
         부모 커밋 목록을 지정하지 않으면 자동으로 현재 브랜치가 가리키던 이전 커밋을 부모로 사용합니다.
 
         :param message: 커밋 메시지
-        :param blobs: 저장할 파일 데이터 딕셔너리 (파일명: 파일내용)
+        :param file_meta: 저장할 파일 메타데이터 딕셔너리 (파일명: 파일내용)
         :param parents: 명시적인 부모 커밋 ID 리스트 (생략 시 현재 활성 브랜치의 최신 커밋을 부모로 지정)
         :return: 새로 생성된 커밋의 고유 ID
         """
@@ -70,7 +70,7 @@ class Git:
             else:
                 parents = []  # 부모가 없는 최초 커밋(Root Commit)
 
-        str_commit_id = self.graph.add_commit(message, self.user, blobs, parents)
+        str_commit_id = self.graph.add_commit(message, self.user, file_meta, parents)
         self.branches[self.current_branch] = (
             str_commit_id  # 현재 브랜치가 최신 커밋을 가리키도록 갱신
         )
@@ -102,7 +102,7 @@ class Git:
 
         :param main_commit_id: 현재 활성 브랜치의 최신 커밋 ID
         :param feature_commit_id: 병합할 대상 브랜치의 최신 커밋 ID
-        :return: (충돌 유무 플래그, 병합이 완료된 blobs 결과 딕셔너리) 튜플
+        :return: (충돌 유무 플래그, 병합이 완료된 file_meta 결과 딕셔너리) 튜플
         """
         # 1. 두 브랜치의 공통 조상(LCA) 탐색
         ancestor_res = self.graph.find_common_ancestor(
@@ -114,38 +114,38 @@ class Git:
 
         base_commit_id, _ = ancestor_res
 
-        # 각 커밋에서의 파일 스냅샷(blobs) 가져오기
-        base_blobs = self.graph.commit_dict[base_commit_id].blobs
-        main_blobs = self.graph.commit_dict[main_commit_id].blobs
-        feature_blobs = self.graph.commit_dict[feature_commit_id].blobs
+        # 각 커밋에서의 파일 메타데이터(file_meta) 가져오기
+        base_file_meta = self.graph.commit_dict[base_commit_id].file_meta
+        main_file_meta = self.graph.commit_dict[main_commit_id].file_meta
+        feature_file_meta = self.graph.commit_dict[feature_commit_id].file_meta
 
         # 세 버전의 파일 목록 전체 수집
         all_files = (
-            set(base_blobs.keys()) | set(main_blobs.keys()) | set(feature_blobs.keys())
+            set(base_file_meta.keys()) | set(main_file_meta.keys()) | set(feature_file_meta.keys())
         )
 
-        merged_blobs = {}
+        merged_file_meta = {}
         conflicts = {}
         has_conflict = False
 
         # 각 파일에 대해 3방향 상태 판별 알고리즘 수행
         for file_name in all_files:
-            base_content = base_blobs.get(file_name)
-            main_content = main_blobs.get(file_name)
-            feature_content = feature_blobs.get(file_name)
+            base_content = base_file_meta.get(file_name)
+            main_content = main_file_meta.get(file_name)
+            feature_content = feature_file_meta.get(file_name)
 
             # 1. 양쪽 동일 변경 (동일 내용 수정 또는 미수정, 동일한 삭제 포함)
             if main_content == feature_content:
                 if main_content is not None:
-                    merged_blobs[file_name] = main_content
+                    merged_file_meta[file_name] = main_content
             # 2. 한쪽만 변경 (main만 변경되고 feature는 base와 동일한 경우)
             elif feature_content == base_content:
                 if main_content is not None:
-                    merged_blobs[file_name] = main_content
+                    merged_file_meta[file_name] = main_content
             # 3. 한쪽만 변경 (feature만 변경되고 main은 base와 동일한 경우)
             elif main_content == base_content:
                 if feature_content is not None:
-                    merged_blobs[file_name] = feature_content
+                    merged_file_meta[file_name] = feature_content
 
             # Case D: 양쪽 브랜치가 다르게 변경한 경우 -> 충돌(Conflict) 처리
             else:
@@ -157,15 +157,15 @@ class Git:
                     f"<<<<<<< HEAD\n{main_val}\n=======\n{feat_val}\n>>>>>>> REMOTE"
                 )
                 print(conflict_text)
-                merged_blobs[file_name] = conflict_text
+                merged_file_meta[file_name] = conflict_text
                 conflicts[file_name] = conflict_text
                 has_conflict = True
 
-        return has_conflict, merged_blobs, conflicts
+        return has_conflict, merged_file_meta, conflicts
 
     def finalize_merge(self, main_commit_id, feature_commit_id, message="Merge branch"):
         """
-        3-Way Merge의 성공 여부를 검사하고, 충돌이 없다면 자동으로 병합된 결과를 받아 두 개의 부모를 가리키는 Merge 커밋을 생성합니다.
+        3-Way Merge of success/fail checks, and if there are no conflicts, automatically receives the merged result to create a Merge commit pointing to two parents.
 
         :param main_commit_id: 현재 활성 브랜치의 최신 커밋 ID
         :param feature_commit_id: 병합할 대상 브랜치의 최신 커밋 ID
@@ -173,7 +173,7 @@ class Git:
         :return: 생성된 병합 커밋 ID, 충돌이 있거나 오류 발생 시 None
         """
         merge_result = self.three_way_merge(main_commit_id, feature_commit_id)
-        has_conflict, merged_blobs, conflicts = merge_result
+        has_conflict, merged_file_meta, conflicts = merge_result
         
         if has_conflict:
             raise MergeConflictError(conflicts)
@@ -184,7 +184,7 @@ class Git:
 
         # 두 부모(main_commit_id, feature_commit_id)를 지정하여 병합 커밋 완료
         str_commit_id = self.commit(
-            message, merged_blobs, [main_commit_id, feature_commit_id]
+            message, merged_file_meta, [main_commit_id, feature_commit_id]
         )
 
         return str_commit_id
