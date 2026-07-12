@@ -187,7 +187,7 @@ print("최종 추천 학습 순서:", topological_sort(prerequisites))
 
 #### 2) 사용하는 이유와 Git에서의 역할
 * **무방향 가중치 없는 최단 경로**: Git의 커밋 간 관계는 모든 연결 비용이 1로 동일한 조건이므로 BFS 탐색이 수학적으로 가장 빠르고 가볍습니다.
-* **사전순 최단 경로**: 동일한 최단 거리로 도달할 수 있는 여러 경로가 존재할 경우, 경로 상의 해시 문자열을 연결하여 사전순으로 정렬한 뒤 가장 빠른 것을 선택하여 결정론적 결과를 보장합니다.
+* **사전순 최단 경로**: 동일한 최단 거리로 도달할 수 있는 여러 경로가 존재할 경우, 단순 문자열 사전순 비교 시 숫자 해시(예: "21" vs "3")의 대소 판단 오류가 발생할 수 있습니다. 이를 방지하기 위해 경로상의 노드 식별자를 정수로 파싱한 튜플을 기준으로 대소 비교(Tie-breaker)를 수행하고, 최종 최적 경로(리스트 형태)를 반환하여 결정론적이고 정확한 결과를 보장합니다. (이후 고수준 호출부에서 필요에 따라 "->"로 결합하여 사용합니다.)
 
 #### 3) 파이썬으로 구현하기
 <details>
@@ -245,6 +245,7 @@ print("A에서 F까지의 사전순 최단 경로:", find_lexicographical_shorte
 
 #### 4) 코드 동작 설명
 * 목적지 `F`에서 시작해 모든 노드까지의 거리를 계산해 두고, 출발지 `A`부터는 "나보다 목적지까지 남은 거리가 딱 1만큼 적은 이웃"만 골라 한 단계씩 전진합니다. 만약 조건이 겹치면 알파벳 사전순(`candidates.sort()`)으로 첫 번째 요소를 짚어 나감으로써 최단 경로를 구합니다.
+* **실제 구현과의 매핑**: `last_minigit` 프로젝트의 `CommitGraph.find_shortest_path` 메서드에서는 커밋 해시가 숫자 문자열(예: `"3"`, `"21"`)이므로 단순 문자열 사전순 비교 시 `"21" < "3"`이 참이 되는 오류가 발생할 수 있습니다. 이를 방지하기 위해 각 노드 문자열을 정수(`int`)로 변환한 튜플을 기준으로 대소 비교(Tie-breaker)를 수행한 뒤, 최종 최적 경로를 문자열 리스트 형태로 반환합니다.
 
 ---
 
@@ -585,10 +586,10 @@ print("어휘 분석 파싱 결과:", parse_shell_command(sample_command))
 ```python
 # 1. 간단한 가상 커밋 그래프 구조
 class DummyCommit:
-    def __init__(self, key, parents, blobs):
+    def __init__(self, key, parents, file_meta):
         self.key = key
         self.parents = parents
-        self.blobs = blobs
+        self.file_meta = file_meta
 
 dummy_commits = {
     "C1": DummyCommit("C1", [], {"file1.txt": "original content"}),
@@ -597,7 +598,7 @@ dummy_commits = {
 }
 
 # 2. 3-Way Merge 판단 엔진
-def three_way_merge_blobs(base, mine, theirs):
+def three_way_merge_file_meta(base, mine, theirs):
     all_keys = set(base.keys()) | set(mine.keys()) | set(theirs.keys())
     merged = {}
     conflict = False
@@ -630,10 +631,10 @@ def three_way_merge_blobs(base, mine, theirs):
     return conflict, merged
 
 # 시뮬레이션 구동
-is_conflict, result = three_way_merge_blobs(
-    dummy_commits["C1"].blobs,
-    dummy_commits["C2"].blobs,
-    dummy_commits["C3"].blobs
+is_conflict, result = three_way_merge_file_meta(
+    dummy_commits["C1"].file_meta,
+    dummy_commits["C2"].file_meta,
+    dummy_commits["C3"].file_meta
 )
 print("충돌 여부:", is_conflict)
 print("병합 파일 상태:", result)

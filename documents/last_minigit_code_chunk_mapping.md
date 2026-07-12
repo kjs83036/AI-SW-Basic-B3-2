@@ -25,7 +25,7 @@
       hash: str
       message: str
       author: str
-      blobs: dict
+      file_meta: dict
       parents: list = field(default_factory=list)
       # [이론 14] 유닉스 시간과 타임스탬프 - 커밋 생성 시간을 실수형 타임스탬프로 기록
       timestamp: float = field(default_factory=time.time)
@@ -59,7 +59,7 @@
   <summary>CommitGraph.add_commit 소스 코드 보기 (적용 이론: [이론 7] 해시 테이블, [이론 1] DAG, [이론 8] REPL 파싱, [이론 6] 역색인)</summary>
 
   ```python
-      def add_commit(self, message, author, blobs, parents):
+      def add_commit(self, message, author, file_meta, parents):
           # [이론 7] 해시 테이블 - 순차 카운터를 사용하여 고유 Key 준비
           self.commit_id_counter += 1
           str_commit_id = str(self.commit_id_counter)
@@ -68,7 +68,7 @@
           parents_list = parents if parents is not None else []
 
           # [이론 1] DAG - Commit 객체를 생성하여 부모 노드들과 연결 관계 형성
-          commit = Commit(str_commit_id, message, author, blobs, parents_list)
+          commit = Commit(str_commit_id, message, author, file_meta, parents_list)
           # [이론 7] 해시 테이블 - dict에 커밋 ID를 Key로 객체 등록
           self.commit_dict[str_commit_id] = commit
 
@@ -248,13 +248,13 @@
           if not found_paths:
               return None
 
-          # [이론 3] 최단 경로 알고리즘 - 최단 경로가 여러 개일 때 사전순(Lexicographical)으로 단일 최적 루트 선정
+          # [이론 3] 최단 경로 알고리즘 - 최단 경로가 여러 개일 때 정수 변환 비교 후 사전순(Lexicographical)으로 단일 최적 루트 선정
           best_path = None
-          best_str = None
+          best_key = None
           for path in found_paths:
-              path_str = "->".join(path)
-              if best_str is None or path_str < best_str:
-                  best_str = path_str
+              path_key = tuple(int(x) for x in path)
+              if best_key is None or path_key < best_key:
+                  best_key = path_key
                   best_path = path
 
           return best_path
@@ -343,7 +343,7 @@
   <summary>Git.commit 소스 코드 보기 (적용 이론: [이론 13] Git 참조와 HEAD, [이론 1] DAG)</summary>
 
   ```python
-      def commit(self, message, blobs, parents=None):
+      def commit(self, message, file_meta, parents=None):
           if parents is None:
               # [이론 13] Git 참조와 HEAD - 부모 생략 시 HEAD가 가리키고 있던 최신 커밋을 부모로 자동 연계
               current_commit_id = self.branches[self.current_branch]
@@ -353,7 +353,7 @@
                   parents = []  # 부모가 없는 최초 커밋(Root Commit)
           
           # [이론 1] DAG - 그래프에 정점(Commit)을 영구 등록
-          str_commit_id = self.graph.add_commit(message, self.user, blobs, parents)
+          str_commit_id = self.graph.add_commit(message, self.user, file_meta, parents)
           # [이론 13] Git 참조와 HEAD - 현재 활성 브랜치의 참조 꼬리표를 방금 만든 커밋 번호로 이동
           self.branches[self.current_branch] = str_commit_id
 
@@ -396,34 +396,34 @@
           
           base_commit_id, _ = ancestor_res
           
-          base_blobs = self.graph.commit_dict[base_commit_id].blobs
-          main_blobs = self.graph.commit_dict[main_commit_id].blobs
-          feature_blobs = self.graph.commit_dict[feature_commit_id].blobs
+          base_file_meta = self.graph.commit_dict[base_commit_id].file_meta
+          main_file_meta = self.graph.commit_dict[main_commit_id].file_meta
+          feature_file_meta = self.graph.commit_dict[feature_commit_id].file_meta
 
-          all_files = set(base_blobs.keys()) | set(main_blobs.keys()) | set(feature_blobs.keys())
+          all_files = set(base_file_meta.keys()) | set(main_file_meta.keys()) | set(feature_file_meta.keys())
 
-          merged_blobs = {}
+          merged_file_meta = {}
           conflicts = {}
           has_conflict = False
 
           # [이론 9] 3-Way Merge - Base 스냅샷 대비 Mine(내꺼)과 Theirs(상대방)의 수정 방향을 3방향 대조 판별
           for file_name in all_files:
-              base_content = base_blobs.get(file_name)
-              main_content = main_blobs.get(file_name)
-              feature_content = feature_blobs.get(file_name)
+              base_content = base_file_meta.get(file_name)
+              main_content = main_file_meta.get(file_name)
+              feature_content = feature_file_meta.get(file_name)
 
               # 1. 양쪽 동일 변경 (동일 내용 수정 또는 미수정, 동일한 삭제 포함)
               if main_content == feature_content:
                   if main_content is not None:
-                      merged_blobs[file_name] = main_content
+                      merged_file_meta[file_name] = main_content
               # 2. 한쪽만 변경 (main만 변경되고 feature는 base와 동일한 경우)
               elif feature_content == base_content:
                   if main_content is not None:
-                      merged_blobs[file_name] = main_content
+                      merged_file_meta[file_name] = main_content
               # 3. 한쪽만 변경 (feature만 변경되고 main은 base와 동일한 경우)
               elif main_content == base_content:
                   if feature_content is not None:
-                      merged_blobs[file_name] = feature_content
+                      merged_file_meta[file_name] = feature_content
 
               # 양쪽 브랜치가 같은 파일을 서로 다르게 고친 경우 충돌 마커 기입
               else:
@@ -431,22 +431,22 @@
                   feat_val = feature_content if feature_content is not None else "[파일 없음]"
                   conflict_text = f"<<<<<<< HEAD\n{main_val}\n=======\n{feat_val}\n>>>>>>> REMOTE"
                   print(conflict_text)
-                  merged_blobs[file_name] = conflict_text
+                  merged_file_meta[file_name] = conflict_text
                   conflicts[file_name] = conflict_text
                   has_conflict = True
 
-          return has_conflict, merged_blobs, conflicts
+          return has_conflict, merged_file_meta, conflicts
       
       def finalize_merge(self, main_commit_id, feature_commit_id, message="Merge branch"):
           merge_result = self.three_way_merge(main_commit_id, feature_commit_id)
-          has_conflict, merged_blobs, conflicts = merge_result
+          has_conflict, merged_file_meta, conflicts = merge_result
           
           # [이론 9] 3-Way Merge - 충돌 발생 시 MergeConflictError 예외 발생
           if has_conflict:
               raise MergeConflictError(conflicts)
           
           # [이론 1] DAG (Merge Commit) - 두 개의 부모 커밋 ID를 리스트형 인자로 주입하여 다중 부모 노드를 DAG 상에 조립
-          str_commit_id = self.commit(message, merged_blobs, [main_commit_id, feature_commit_id])
+          str_commit_id = self.commit(message, merged_file_meta, [main_commit_id, feature_commit_id])
 
           return str_commit_id
   ```

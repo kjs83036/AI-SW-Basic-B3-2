@@ -155,7 +155,7 @@
 
 ---
 
-### 3.4 최초 커밋 생성 (COMMIT) - 작성자: Alice (blobs 데이터 포함)
+### 3.4 최초 커밋 생성 (COMMIT) - 작성자: Alice (file_meta 데이터 포함)
 * **REPL CLI 입력**:
   ```text
   mini-git> COMMIT "Initial commit" file1.txt:hello
@@ -262,19 +262,19 @@
 * **그에 대한 CLI 결과**:
   ```text
   commit 1 (Alice, 2026-07-05 21:55:00)
-  Blobs: {'file1.txt': 'hello'}
+  FileMeta: {'file1.txt': 'hello'}
   Initial commit
 
   commit 2 (Bob, 2026-07-05 21:55:05) [feature]
-  Blobs: {'file2.txt': 'auth'}
+  FileMeta: {'file2.txt': 'auth'}
   Add login feature
 
   commit 3 (Charlie, 2026-07-05 21:55:10)
-  Blobs: {'file3.txt': 'pay'}
+  FileMeta: {'file3.txt': 'pay'}
   Add payment feature
 
   commit 4 (Charlie, 2026-07-05 21:55:15) [main]
-  Blobs: {'file3.txt': 'pay', 'file2.txt': 'auth'}
+  FileMeta: {'file3.txt': 'pay', 'file2.txt': 'auth'}
   Merge branch 'feature'
   ```
 
@@ -327,19 +327,19 @@
 * **그에 대한 CLI 결과**:
   ```text
   commit 1 (Alice, 2026-07-05 21:55:00)
-  Blobs: {'file1.txt': 'hello'}
+  FileMeta: {'file1.txt': 'hello'}
   Initial commit
 
   commit 2 (Bob, 2026-07-05 21:55:05)
-  Blobs: {'file2.txt': 'auth'}
+  FileMeta: {'file2.txt': 'auth'}
   Add login feature
 
   commit 3 (Charlie, 2026-07-05 21:55:10)
-  Blobs: {'file3.txt': 'pay'}
+  FileMeta: {'file3.txt': 'pay'}
   Add payment feature
 
   commit 4 (Charlie, 2026-07-05 21:55:15)
-  Blobs: {'file3.txt': 'pay', 'file2.txt': 'auth'}
+  FileMeta: {'file3.txt': 'pay', 'file2.txt': 'auth'}
   Merge branch 'feature'
   ```
 
@@ -475,8 +475,8 @@
   SHOW 1
   ```
 * **검증 내용**:
-  - `SHOW` 입력 시 현재 브랜치(main)의 가장 최신 커밋 정보(메시지, 작성자, 날짜, 포인터 브랜치)와 해당 시점의 blobs 파일 스냅샷이 출력되는지 확인합니다.
-  - `SHOW 1` 입력 시 지정한 1번 커밋의 상세 정보와 blobs 데이터가 출력되는지 검증합니다.
+  - `SHOW` 입력 시 현재 브랜치(main)의 가장 최신 커밋 정보(메시지, 작성자, 날짜, 포인터 브랜치)와 해당 시점의 file_meta 파일 스냅샷이 출력되는지 확인합니다.
+  - `SHOW 1` 입력 시 지정한 1번 커밋의 상세 정보와 file_meta 데이터가 출력되는지 검증합니다.
 
 #### Step 13: CLI 세션 종료 (EXIT)
 * **REPL CLI 입력**:
