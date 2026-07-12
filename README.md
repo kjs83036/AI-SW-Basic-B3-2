@@ -105,9 +105,9 @@ python3 -m unittest test_minigit.py
 | **INIT** | `INIT <user_name>` | 저장소를 초기화하고 기본 `main` 브랜치 설정 및 작성자를 등록합니다. |
 | **BRANCH** | `BRANCH [branch_name]` | 인자 생략 시 브랜치 목록을 조회하고(현재 브랜치는 * 표시), 인자 입력 시 현재 HEAD 커밋을 가리키는 새로운 브랜치를 생성합니다. |
 | **SWITCH** | `SWITCH <branch_name>` | 활성화된 브랜치를 변경합니다. (HEAD 이동) |
-| **COMMIT** | `COMMIT <message> [file_name:content ...]` | 현재 브랜치가 가리키던 커밋을 부모로 두는 신규 커밋을 생성(파일 스냅샷 blobs 반영)하고 역색인을 갱신합니다. |
+| **COMMIT** | `COMMIT <message> [file_name:content ...]` | 현재 브랜치가 가리키던 커밋을 부모로 두는 신규 커밋을 생성(파일 스냅샷 file_meta 반영)하고 역색인을 갱신합니다. |
 | **LOG** | `LOG [--sort-by=date\|author]` | 전체 커밋 히스토리를 위상 정렬 순서로 출력하거나, 옵션 지정 시 커스텀 병합 정렬을 활용해 날짜/작성자 기준으로 정렬하여 출력합니다. |
-| **SHOW** | `SHOW [commit_hash]` | 지정한 커밋(생략 시 현재 브랜치의 최신 커밋)의 상세 정보(작성자, 날짜, blobs, 메시지 등)를 출력합니다. |
+| **SHOW** | `SHOW [commit_hash]` | 지정한 커밋(생략 시 현재 브랜치의 최신 커밋)의 상세 정보(작성자, 날짜, file_meta, 메시지 등)를 출력합니다. |
 | **PATH** | `PATH <commit1> <commit2>` | 두 커밋 사이의 무방향 최단 경로를 사전순 Tie-breaking을 적용하여 출력합니다. |
 | **ANCESTORS** | `ANCESTORS <commit_hash>` | 스택 기반 반복적 DFS를 통하여 해당 커밋이 상속하고 있는 모든 조상 커밋 목록을 출력합니다. |
 | **SEARCH** | `SEARCH <keyword> \| --author=<name>` | 역색인 사전을 활용하여 메시지 키워드 또는 작성자명 기준으로 커밋 목록을 고속 검색합니다. |
