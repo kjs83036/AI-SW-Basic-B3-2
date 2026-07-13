@@ -1,6 +1,6 @@
 import cmd
 import shlex
-from mini_git import Git, MergeConflictError
+from mini_git import Git, MergeConflictError, quick_sort
 from functools import wraps
 from datetime import datetime
 
@@ -60,13 +60,7 @@ class GitShell(cmd.Cmd):
         """
         내장 정렬(sorted(), list.sort())을 대체하기 위해 직접 구현한 퀵 정렬 함수입니다.
         """
-        if len(arr) <= 1:
-            return arr
-        pivot = arr[len(arr) // 2]
-        left = [x for x in arr if x < pivot]
-        middle = [x for x in arr if x == pivot]
-        right = [x for x in arr if x > pivot]
-        return self.custom_sort(left) + middle + self.custom_sort(right)
+        return quick_sort(arr)
 
     def do_EXIT(self, arg):
         """프로그램을 종료합니다."""
@@ -356,6 +350,28 @@ class GitShell(cmd.Cmd):
             print("충돌 해결후 커밋")
         return False
         
+
+    @require_init
+    @args_to_list
+    def do_DIFF(self, arg):
+        """DIFF <file1> <file2> : 두 텍스트 파일을 줄 단위로 비교하여 차이점을 출력합니다."""
+        if len(arg) != 2:
+            print("Invalid args")
+            return False
+
+        file1, file2 = arg[0], arg[1]
+        try:
+            if self.git is not None:
+                diff_result = self.git.diff(file1, file2)
+                for line in diff_result:
+                    print(line)
+        except FileNotFoundError as e:
+            print(f"Error: {str(e)}")
+        except IOError as e:
+            print(f"Error: {str(e)}")
+        except Exception as e:
+            print(f"Error: {str(e)}")
+        return False
 
     def do_HELP(self, arg):
         """HELP [command] : 도움말 목록을 보거나 특정 명령어의 사용법을 봅니다."""

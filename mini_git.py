@@ -1,5 +1,62 @@
 from commit_graph import Commit, CommitGraph
 from datetime import datetime
+import time
+from functools import wraps
+
+
+def measure_time(func):
+    """실행 시간을 측정하는 데코레이터"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        end_time = time.perf_counter()
+        print(f"[Time] {func.__name__} took {end_time - start_time:.8f} seconds")
+        return result
+    return wrapper
+
+
+def _merge_sort_recursive(arr, key_func):
+    if len(arr) <= 1:
+        return arr
+    mid = len(arr) // 2
+    left = _merge_sort_recursive(arr[:mid], key_func)
+    right = _merge_sort_recursive(arr[mid:], key_func)
+
+    result = []
+    i = j = 0
+    while i < len(left) and j < len(right):
+        if key_func(left[i]) <= key_func(right[j]):
+            result.append(left[i])
+            i += 1
+        else:
+            result.append(right[j])
+            j += 1
+    result.extend(left[i:])
+    result.extend(right[j:])
+    return result
+
+
+@measure_time
+def merge_sort(arr, key_func=lambda x: x):
+    """외부 함수로 분리된 병합 정렬 (Stable Sort, O(N log N))"""
+    return _merge_sort_recursive(arr, key_func)
+
+
+def _quick_sort_recursive(arr, key_func):
+    if len(arr) <= 1:
+        return arr
+    pivot = arr[len(arr) // 2]
+    left = [x for x in arr if key_func(x) < key_func(pivot)]
+    middle = [x for x in arr if key_func(x) == key_func(pivot)]
+    right = [x for x in arr if key_func(x) > key_func(pivot)]
+    return _quick_sort_recursive(left, key_func) + middle + _quick_sort_recursive(right, key_func)
+
+
+@measure_time
+def quick_sort(arr, key_func=lambda x: x):
+    """외부 함수로 분리된 퀵 정렬 (O(N log N) 평균)"""
+    return _quick_sort_recursive(arr, key_func)
 
 
 class MergeConflictError(Exception):
@@ -278,29 +335,59 @@ class Git:
             raise ValueError(f"Unknown sort option:{sort_by}")
             return
 
-        # 병합 정렬 (Merge Sort - 최악/평균 O(N log N) 보장 및 동점자 간 원래 순서를 유지하는 안정 정렬)
-        def merge_sort(arr):
-            if len(arr) <= 1:
-                return arr
-            mid = len(arr) // 2
-            left = merge_sort(arr[:mid])
-            right = merge_sort(arr[mid:])
-            return _merge_sorted_arrays(left, right)
+        return merge_sort(commits, key_func)
 
-        def _merge_sorted_arrays(left, right):
-            result = []
-            i = j = 0
-            while i < len(left) and j < len(right):
-                # 동점 조건시 안정성을 유지하기 위해 '<=' 비교 사용
-                if key_func(left[i]) <= key_func(right[j]):
-                    result.append(left[i])
-                    i += 1
+    def diff(self, file1_path, file2_path):
+        """
+        두 텍스트 파일을 읽어 줄 단위로 비교하고 추가/삭제/공통 줄을 구분해 반환합니다.
+        [이론 20] LCS (Longest Common Subsequence) 알고리즘이 적용되었습니다.
+        
+        :param file1_path: 첫 번째 파일 경로
+        :param file2_path: 두 번째 파일 경로
+        :return: 각 라인의 비교 결과를 담은 문자열 리스트
+        """
+        try:
+            with open(file1_path, 'r', encoding='utf-8') as f1:
+                lines1 = [line.rstrip('\r\n') for line in f1.readlines()]
+        except FileNotFoundError:
+            raise FileNotFoundError(f"File not found: {file1_path}")
+        except Exception as e:
+            raise IOError(f"Error reading {file1_path}: {str(e)}")
+
+        try:
+            with open(file2_path, 'r', encoding='utf-8') as f2:
+                lines2 = [line.rstrip('\r\n') for line in f2.readlines()]
+        except FileNotFoundError:
+            raise FileNotFoundError(f"File not found: {file2_path}")
+        except Exception as e:
+            raise IOError(f"Error reading {file2_path}: {str(e)}")
+
+        # DP 기반 최장 공통 부분 수열(LCS) 계산
+        m, n = len(lines1), len(lines2)
+        dp = [[0] * (n + 1) for _ in range(m + 1)]
+
+        for i in range(1, m + 1):
+            for j in range(1, n + 1):
+                if lines1[i - 1] == lines2[j - 1]:
+                    dp[i][j] = dp[i - 1][j - 1] + 1
                 else:
-                    result.append(right[j])
-                    j += 1
-            result.extend(left[i:])
-            result.extend(right[j:])
-            return result
-        return merge_sort(commits)
-        # sorted_commit = merge_sort(commits)
-        # self._print_commit_logs(sorted_commit)
+                    dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+
+        # 역추적(Backtracking)하여 Diff 조립
+        diff_result = []
+        i, j = m, n
+        while i > 0 or j > 0:
+            if i > 0 and j > 0 and lines1[i - 1] == lines2[j - 1]:
+                diff_result.append(f"  {lines1[i - 1]}")
+                i -= 1
+                j -= 1
+            elif j > 0 and (i == 0 or dp[i][j - 1] >= dp[i - 1][j]):
+                diff_result.append(f"+ {lines2[j - 1]}")
+                j -= 1
+            elif i > 0 and (j == 0 or dp[i][j - 1] < dp[i - 1][j]):
+                diff_result.append(f"- {lines1[i - 1]}")
+                i -= 1
+
+        diff_result.reverse()
+        return diff_result
+

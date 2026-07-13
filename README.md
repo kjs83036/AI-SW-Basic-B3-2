@@ -20,7 +20,7 @@ Mini Git은 Git의 핵심 자료구조인 DAG(Directed Acyclic Graph)와 해시 
 프로젝트 설계 명세, 핵심 CS 이론 분석 가이드 및 테스트 결과 등 자세한 참고 자료는 아래 문서들에서 확인할 수 있습니다.
 
 * **[minigit_srs.md](./documents/minigit_srs.md)**: Mini Git의 요구사항 명세서(Software Requirements Specification). 시스템 기능 요구사항 및 제약 조건이 정의되어 있습니다.
-* **[cs_theory_report_v4.md](./documents/cs_theory_report_v4.md)**: Mini Git에 적용된 14가지 컴퓨터 사이언스(CS) 핵심 이론의 기본 개념과 비유적 설명, 구현 상세 및 Git 참조 구조와의 연계 분석 내용을 담고 있습니다.
+* **[cs_theory_report_v5.md](./documents/cs_theory_report_v5.md)**: Mini Git에 적용된 20가지 컴퓨터 사이언스(CS) 핵심 이론의 기본 개념과 비유적 설명, 구현 상세 및 Git 참조 구조와의 연계 분석 내용을 담고 있습니다.
 * **[last_minigit_code_chunk_mapping.md](./documents/last_minigit_code_chunk_mapping.md)**: `last_minigit` 프로젝트의 파이썬 코드 내 이론 적용 지점을 주석과 요약라인 형태로 매핑하여 매치시킨 분석 가이드입니다.
 * **[test_results.md](./documents/test_results.md)**: 단위 테스트 및 무작위 분기/병합 스트레스 테스트 스위트의 실행 결과 보고서입니다.
 
@@ -95,6 +95,10 @@ python3 -m unittest test_minigit.py
 * `test_minigit.py`에 100회 이상의 대규모 가상 커밋 생성 및 무작위 분기/병합을 유발하는 스트레스 시나리오를 설계했습니다.
 * 대규모 그래프 구조 내에서 무방향 BFS 최단 경로 탐색, 역색인 키워드 조회, 병합 정렬 알고리즘의 동작 성능 및 데이터 무결성을 엄격하게 자동 검증합니다.
 
+### 4.11 두 파일 간의 줄 단위 차이점 비교 (DIFF)
+* 두 텍스트 파일의 경로를 입력받아 줄(Line) 단위로 비교 분석하고 추가/삭제/공통 줄을 시각화하는 `DIFF` 기능을 지원합니다.
+* 동적 계획법(Dynamic Programming) 기반의 **LCS (Longest Common Subsequence - 최장 공통 부분 수열)** 알고리즘을 사용하며, 역추적(Backtracking)을 통해 차이점 스냅샷을 정확하게 추출합니다.
+
 ---
 
 ## 5. 명령어 일람 (Command Reference)
@@ -113,6 +117,7 @@ python3 -m unittest test_minigit.py
 | **SEARCH** | `SEARCH <keyword> \| --author=<name>` | 역색인 사전을 활용하여 메시지 키워드 또는 작성자명 기준으로 커밋 목록을 고속 검색합니다. |
 | **MERGE** | `MERGE <branch_name>` | 현재 브랜치와 대상 브랜치를 3-Way 병합하여 두 부모를 가지는 Merge 커밋을 자동 조립합니다. 충돌 발생 시 conflict 마커가 삽입됩니다. |
 | **USERLIST** | `USERLIST` | 저장소 세션 및 커밋 그래프 내에 등록된 모든 유저 목록과 현재 활성화된 유저를 정렬하여 출력합니다. |
+| **DIFF** | `DIFF <file1> <file2>` | 두 텍스트 파일을 읽어 줄 단위로 비교하고 최장 공통 부분 수열(LCS)을 활용하여 추가/삭제/공통 내용을 콘솔에 출력합니다. |
 | **EXIT / QUIT** | `EXIT` / `QUIT` | CLI 프로그램을 종료합니다. |
 
 ---
@@ -122,3 +127,32 @@ python3 -m unittest test_minigit.py
 * 저장소가 초기화되기 전(`INIT` 수행 전) 명령을 실행하면 `Error: Repository not initialized.` 에러를 출력하여 비정상 조작을 차단합니다.
 * 존재하지 않는 브랜치 접근 시 `Unknown branch: <name>`, 유효하지 않은 커밋 ID 조회 시 `Unknown commit: <hash>` 오류를 띄웁니다.
 * 모든 데이터와 커밋 그래프는 세션 단위의 메모리 상에서 안전하게 처리됩니다 (영속성 I/O 및 네트워크 배제).
+
+---
+
+## 7. 정렬 알고리즘 성능 비교
+
+프로젝트 내에서 직접 구현하여 사용하는 병합 정렬(Merge Sort)과 퀵 정렬(Quick Sort)의 성능을 측정하고, Python 내장 정렬(Timsort)과의 차이를 비교 분석했습니다.
+
+### 7.1 벤치마크 환경 및 결과
+- **측정 도구**: `time.perf_counter()`를 기반으로 한 `@measure_time` 데코레이터 적용
+- **데이터 종류**: 무작위 정수 배열 (랜덤 시드 고정)
+- **입력 크기별 실행 시간**:
+
+| 입력 크기 (N) | 병합 정렬 (Merge Sort) | 퀵 정렬 (Quick Sort) | 파이썬 내장 (Timsort) |
+| :--- | :--- | :--- | :--- |
+| 100 | 0.000303초 | 0.000340초 | 0.000007초 |
+| 500 | 0.001773초 | 0.002959초 | 0.000035초 |
+| 1,000 | 0.003707초 | 0.006010초 | 0.000073초 |
+| 2,000 | 0.008303초 | 0.011075초 | 0.000158초 |
+| 5,000 | 0.023372초 | 0.032460초 | 0.000565초 |
+
+### 7.2 성능 및 특성 분석
+1. **병합 정렬 vs 퀵 정렬**:
+   - 본 구현에서는 **병합 정렬(Merge Sort)**이 퀵 정렬보다 다소 빠르게 측정되었습니다.
+   - 이는 퀵 정렬 구현 시 리스트 컴프리헨션을 통해 매 분할 단계마다 새로운 서브 리스트(`left`, `middle`, `right`)를 생성하고 메모리 복사가 반복적으로 발생했기 때문입니다.
+2. **안정성 (Stable Sort)**:
+   - **병합 정렬**은 비교 연산 시 `key_func(left[i]) <= key_func(right[j])` 조건으로 동일 값의 인덱스 순서를 보존하여 **안정 정렬(Stable Sort)** 요건을 충족합니다. Git 커밋 히스토리를 날짜/작성자 기준으로 다중 정렬할 때 순서가 흐트러지지 않는 신뢰성을 제공합니다.
+   - **퀵 정렬**은 피벗 기준 분할 과정에서 인덱스 순서의 보존을 보장하지 않아 불안정 정렬(Unstable Sort) 특성을 보입니다.
+3. **파이썬 내장 정렬(Timsort)의 압도적인 성능**:
+   - 파이썬의 `sorted()`는 C 언어로 작성되어 하드웨어 레벨의 최적화가 이루어져 있고, 최악의 경우에도 $O(N \log N)$을 보장하는 하이브리드 정렬(Timsort)입니다. 자체 구현한 순수 파이썬 정렬에 비해 약 40~50배 이상의 성능 우위를 나타냅니다.
