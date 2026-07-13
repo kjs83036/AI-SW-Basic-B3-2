@@ -2,7 +2,7 @@
 
 이 가이드는 `last_minigit` 프로젝트의 실제 파이썬 소스 코드 내부에 **컴퓨터 사이언스(CS) 이론이 적용된 지점을 주석(`# [이론 X] ...`) 형태로 표시**하고, 코드를 펼치기 전인 **접기 상태의 요약 라인(`<summary>`)에서도 어떤 이론이 사용되었는지 한눈에 파악**할 수 있도록 구성했습니다.
 
-상세한 이론 설명(v3에서 추가된 5대 개념 포함)은 이미 [cs_theory_report_v4.md](cs_theory_report_v4.md) 문서에 완전하게 정리되어 있으므로 이 파일에서는 생략했습니다.
+상세한 이론 설명(v3/v5에서 확장된 핵심 개념 포함)은 이미 [cs_theory_report_v5.md](cs_theory_report_v5.md) 문서에 완전하게 정리되어 있으므로 이 파일에서는 생략했습니다.
 
 ---
 
@@ -499,6 +499,51 @@
   ```
   </details>
 
+#### 7) `Git.diff` 메서드 (LCS 기반 파일 비교)
+* <details>
+  <summary>Git.diff 소스 코드 보기 (적용 이론: [이론 20] LCS 최장 공통 부분 수열)</summary>
+
+  ```python
+      def diff(self, file1_path, file2_path):
+          # [이론 20] LCS - 최장 공통 부분 수열을 추적하여 줄 단위 파일 차이점 계산
+          try:
+              with open(file1_path, 'r', encoding='utf-8') as f1:
+                  lines1 = [line.rstrip('\r\n') for line in f1.readlines()]
+          except FileNotFoundError:
+              raise FileNotFoundError(f"File not found: {file1_path}")
+          ...
+          
+          m, n = len(lines1), len(lines2)
+          dp = [[0] * (n + 1) for _ in range(m + 1)]
+
+          # DP 테이블 갱신
+          for i in range(1, m + 1):
+              for j in range(1, n + 1):
+                  if lines1[i - 1] == lines2[j - 1]:
+                      dp[i][j] = dp[i - 1][j - 1] + 1
+                  else:
+                      dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+
+          # 역추적(Backtracking)으로 +, -, 공통 마커 설정
+          diff_result = []
+          i, j = m, n
+          while i > 0 or j > 0:
+              if i > 0 and j > 0 and lines1[i - 1] == lines2[j - 1]:
+                  diff_result.append(f"  {lines1[i - 1]}")
+                  i -= 1
+                  j -= 1
+              elif j > 0 and (i == 0 or dp[i][j - 1] >= dp[i - 1][j]):
+                  diff_result.append(f"+ {lines2[j - 1]}")
+                  j -= 1
+              elif i > 0 and (j == 0 or dp[i][j - 1] < dp[i - 1][j]):
+                  diff_result.append(f"- {lines1[i - 1]}")
+                  i -= 1
+
+          diff_result.reverse()
+          return diff_result
+  ```
+  </details>
+
 ---
 
 ## 3. `main.py` 소스 코드 매핑
@@ -574,7 +619,36 @@
   ```
   </details>
 
-#### 4) `main` 함수 (cmdloop REPL 구동)
+#### 4) `do_DIFF` 메서드 (LCS 기반 두 파일 비교 셸 명령어)
+* <details>
+  <summary>do_DIFF 소스 코드 보기 (적용 이론: [이론 20] LCS 최장 공통 부분 수열)</summary>
+
+  ```python
+      @require_init
+      @args_to_list
+      def do_DIFF(self, arg):
+          # [이론 20] LCS - 최장 공통 부분 수열을 추적하여 줄 단위 파일 차이점 계산 및 출력
+          if len(arg) != 2:
+              print("Invalid args")
+              return False
+
+          file1, file2 = arg[0], arg[1]
+          try:
+              if self.git is not None:
+                  diff_result = self.git.diff(file1, file2)
+                  for line in diff_result:
+                      print(line)
+          except FileNotFoundError as e:
+              print(f"Error: {str(e)}")
+          except IOError as e:
+              print(f"Error: {str(e)}")
+          except Exception as e:
+              print(f"Error: {str(e)}")
+          return False
+  ```
+  </details>
+
+#### 5) `main` 함수 (cmdloop REPL 구동)
 * <details>
   <summary>main 소스 코드 보기 (적용 이론: [이론 8] REPL 파싱과 어휘 분석 REPL 루프)</summary>
 

@@ -1,0 +1,4 @@
+hello
+world
+learn git
+exit

@@ -13,9 +13,9 @@
 
 * **그에 대한 CLI 결과**:
   ```text
-  ...............
+  ..................
   ----------------------------------------------------------------------
-  Ran 15 tests in 0.039s
+  Ran 19 tests in 0.045s
 
   OK
   Initialized repository.
@@ -33,6 +33,25 @@
   Initialized repository.
   Current branch: main
   Current user: Alice
+  Initialized repository.
+  Current branch: main
+  Current user: Alice
+  Initialized repository.
+  Current branch: main
+  Current user: Alice
+  Initialized repository.
+  Current branch: main
+  Current user: Alice
+  <<<<<<< HEAD
+  main_val
+  =======
+  feature_val
+  >>>>>>> REMOTE
+  <<<<<<< HEAD
+  [파일 없음]
+  =======
+  modified_in_feature
+  >>>>>>> REMOTE
   Initialized repository.
   Current branch: main
   Current user: Alice
@@ -345,14 +364,31 @@
 
 ---
 
-### 3.14 세션 종료 (EXIT / QUIT)
+### 3.14 두 파일 간의 줄 단위 차이점 비교 (DIFF)
+* **REPL CLI 입력**:
+  ```text
+  mini-git> DIFF documents/file1.txt documents/file2.txt
+  ```
+* **그에 대한 CLI 결과**:
+  ```text
+    hello
+  + beautiful
+    world
+    learn git
+  - exit
+  + quit
+  ```
+
+---
+
+### 3.15 세션 종료 (EXIT / QUIT)
 * **REPL CLI 입력**:
   ```text
   mini-git> EXIT
   ```
 * **그에 대한 CLI 결과**:
   ```text
-  Goodbye.
+  exit
   ```
 
 ---
@@ -435,9 +471,11 @@
 * **REPL CLI 입력**:
   ```text
   PATH 1 3
+  PATH 2 3  # 공통 조상을 경유하는 무방향 경로 탐색
   ```
 * **검증 내용**:
   - `1`번 커밋부터 `3`번 커밋까지의 최단 무방향 경로인 `1->3`이 정확히 찾아지는지 검증합니다.
+  - `2`번 커밋부터 `3`번 커밋까지 공통 조상 `1`을 거쳐서 도달하는 무방향 최단 경로 `2->1->3`이 정확히 찾아지는지 검증합니다.
 
 #### Step 9: 엄격한 조상 커밋 추적
 * **REPL CLI 입력**:
@@ -462,11 +500,47 @@
   - `SWITCH non_existent` ➔ `Unknown branch: non_existent` 출력
   - `PATH 1 99` ➔ `Unknown commit: 99` 출력
   - `BRANCH` ➔ `Invalid args` 출력
-  - `MERGE 1234` (공통 조상이 없는 경우) ➔ `오류: 공통 조상을 찾을 수 없어 머지를 중단` 출력
-  - `MERGE conflict_branch` (충돌이 발생하는 경우) ➔ `충돌 발생: <파일명>` 및 `<<<<<<< HEAD \n... \n>>>>>>> REMOTE` 충돌 명세가 화면에 출력되는지 확인합니다. (파일이 존재하지 않는 영역은 `[파일 없음]` 표시)
+  
+  **[공통 조상이 없는 독립 트리의 최단 경로 및 머지 에러 검증]**
+  (현재 세션을 종료 `EXIT` 후 `python3 main.py`로 재시작하여 완전히 분리된 독립 구조 구축)
+  - `INIT Alice`
+  - `BRANCH branch1` (아직 커밋이 없어 main이 None이므로 branch1도 None을 가리킴)
+  - `SWITCH branch1`
+  - `COMMIT "Commit on branch1"` ➔ 1번 커밋 생성 (부모 없음, 독립 루트 1)
+  - `SWITCH main`
+  - `COMMIT "Commit on main"` ➔ 2번 커밋 생성 (부모 없음, 독립 루트 2)
+  - `PATH 1 2` ➔ `No path` 출력 (도달 불가한 두 독립 루트 커밋 간 경로 탐색)
+  - `MERGE branch1` ➔ `오류: 공통 조상을 찾을 수 없어 머지를 중단` 출력 (공통 조상 없음)
+  
+  **[병합 충돌 피드백 검증]**
+  (이전 1~10단계를 진행한 세션에서 이어서 진행하여 충돌 환경 구축)
+  - `BRANCH conflict_branch` ➔ 충돌 테스트용 브랜치 생성
+  - `SWITCH conflict_branch` ➔ 충돌 브랜치로 전환
+  - `COMMIT "Edit file1 on conflict branch" file1.txt:feat_val` ➔ file1.txt를 feat_val로 수정하고 다른 파일은 미지정(삭제)한 커밋 생성
+  - `SWITCH main` ➔ main 브랜치로 복구
+  - `COMMIT "Edit file1 and file3 on main" file1.txt:main_val file3.txt:modified_on_main` ➔ main 브랜치에서 file1.txt 수정 및 file3.txt 수정 커밋 생성
+  - `MERGE conflict_branch` ➔ 병합 시도 시 충돌 정보 출력 확인
+    * **예상 결과**:
+      ```text
+      충돌 발생: file1.txt
+      <<<<<<< HEAD
+      main_val
+      =======
+      feat_val
+      >>>>>>> REMOTE
+      충돌 발생: file3.txt
+      <<<<<<< HEAD
+      modified_on_main
+      =======
+      [파일 없음]
+      >>>>>>> REMOTE
+      충돌 해결후 커밋
+      ```
 * **검증 내용**:
   - 잘못된 조작 또는 병합 불가 상태 발생 시 약속된 에러 메시지가 표출되며, 예외 발생 후에도 REPL 세션이 튕기지 않고 지속되는지 검증합니다.
   - 병합 충돌 시 충돌이 일어난 구체적인 원인(파일명 및 충돌 마커 텍스트)이 화면에 상세히 노출되는지 검증합니다.
+  - 편집-편집 충돌과 삭제-수정(한쪽 브랜치에서는 파일이 존재하지 않는 형태) 충돌이 동시에 발생했을 때 각 충돌 내용이 올바른 포맷으로 구분되어 출력되는지 검증합니다.
+
 
 #### Step 12: 특정 커밋 및 최신 커밋 상세 조회 검증 (SHOW)
 * **REPL CLI 입력**:
@@ -478,18 +552,27 @@
   - `SHOW` 입력 시 현재 브랜치(main)의 가장 최신 커밋 정보(메시지, 작성자, 날짜, 포인터 브랜치)와 해당 시점의 file_meta 파일 스냅샷이 출력되는지 확인합니다.
   - `SHOW 1` 입력 시 지정한 1번 커밋의 상세 정보와 file_meta 데이터가 출력되는지 검증합니다.
 
-#### Step 13: CLI 세션 종료 (EXIT)
+#### Step 13: 두 파일 간의 줄 단위 차이점 비교 검증 (DIFF)
+* **REPL CLI 입력**:
+  ```text
+  DIFF documents/file1.txt documents/file2.txt
+  ```
+* **검증 내용**:
+  - `DIFF` 명령 시 지정한 두 파일의 공통 줄, 추가된 줄(`+`), 삭제된 줄(`-`)이 올바른 포맷으로 정확히 대비하여 출력되는지 확인합니다.
+  - 존재하지 않는 파일명을 입력했을 때 `Error: File not found: <filename>` 메시지가 정상 출력되는지 검사합니다.
+
+#### Step 14: CLI 세션 종료 (EXIT)
 * **REPL CLI 입력**:
   ```text
   EXIT
   ```
 * **검증 내용**:
-  - `Goodbye.` 메시지와 함께 프로그램이 성공적으로 터미널에서 탈출 종료되는지 확인합니다.
+  - `exit` 메시지와 함께 프로그램이 성공적으로 터미널에서 탈출 종료되는지 확인합니다.
 
-#### Step 14: 대안 종료 명령어로 세션 종료 (QUIT)
+#### Step 15: 대안 종료 명령어로 세션 종료 (QUIT)
 * **REPL CLI 입력**:
   ```text
   QUIT
   ```
 * **검증 내용**:
-  - `EXIT`와 동일하게 `Goodbye.` 메시지를 띄우며 프로그램이 안전하게 즉시 종료되는지 검증합니다.
+  - `EXIT`와 동일하게 `exit` 메시지를 띄우며 프로그램이 안전하게 즉시 종료되는지 검증합니다.
