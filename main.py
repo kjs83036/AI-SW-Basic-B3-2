@@ -53,7 +53,7 @@ class GitShell(cmd.Cmd):
             date_str = dt.strftime("%Y-%m-%d %H:%M:%S")
             print(f"commit {commit.hash} ({commit.author}, {date_str}){branch_str}")
             print(f"FileMeta: {commit.file_meta}")
-            print(commit.message)
+            print(f"Message: {commit.message}")
             print()
 
     def custom_sort(self, arr):
@@ -250,16 +250,7 @@ class GitShell(cmd.Cmd):
                     return False
 
             commit = self.git.graph.commit_dict[target_commit_id]
-            dt = datetime.fromtimestamp(commit.timestamp)
-            date_str = dt.strftime("%Y-%m-%d %H:%M:%S")
-            poingting_branchs = [
-                br for br, c_hash in self.git.branches.items() if c_hash == target_commit_id
-            ]
-            branch_str = f"[{', '.join(poingting_branchs)}]" if poingting_branchs else ""
-
-            print(f"commit {commit.hash} ({commit.author}, {date_str}){branch_str}")
-            print(f"FileMeta: {commit.file_meta}")
-            print(f"Message: {commit.message}")
+            self._print_commits([commit])
             return False
 
     @require_init
